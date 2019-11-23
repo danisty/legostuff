@@ -226,7 +226,9 @@ WindowPrefs.MakeDraggable = MakeDraggable
 
 function WindowPrefs:CreateWindow(title, size, iconId)
 	local closing = false
-	local window = WindowScreen:Clone().Window
+	local windowScreen = WindowScreen:Clone()
+	local window = windowScreen.Window
+	windowScreen.Parent = game.CoreGui
 	window.WindowTitle.Text = title
 	window.WindowIcon.Image = "rbxassetid://"..iconId
 	
