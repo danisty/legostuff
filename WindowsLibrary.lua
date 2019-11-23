@@ -56,8 +56,6 @@ WindowTitle.Font = Enum.Font.SourceSans
 WindowTitle.Text = "ScriptSpy"
 WindowTitle.TextColor3 = Color3.new(1, 1, 1)
 WindowTitle.TextSize = 15
-WindowTitle.TextScaled = true
-WindowTitle.TextWrapped = true
 WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 Body.Name = "Body"
@@ -124,25 +122,25 @@ function MakeDraggable(panel, handle)
 	end)
 end
 
-function AddShadow(self, size, cZIndex)
+function AddShadow(gObj, size, cZIndex)
 	local Shadow1 = ShadowL1:Clone()
 	local Shadow2 = ShadowL2:Clone()
-	Shadow1.Parent = self
+	Shadow1.Parent = gObj
 	Shadow1.ZIndex = cZIndex or 1
 	Shadow1.Position = UDim2.new(0, -size, 0, -size)
-	Shadow1.Size = self.Size + UDim2.new(0, size*2, 0, size*2)
-	Shadow2.Parent = self
+	Shadow1.Size = gObj.Size + UDim2.new(0, size*2, 0, size*2)
+	Shadow2.Parent = gObj
 	Shadow2.ZIndex = cZIndex or 1
 	Shadow2.Position = UDim2.new(0, -size*2, 0, -size*2)
-	Shadow2.Size = self.Size + UDim2.new(0, size*4, 0, size*4)
-	self.Changed:connect(function()
-		Shadow1.Size = self.Size + UDim2.new(0, size*2, 0, size*2)
-		Shadow2.Size = self.Size + UDim2.new(0, size*4, 0, size*4)
+	Shadow2.Size = gObj.Size + UDim2.new(0, size*4, 0, size*4)
+	gObj.Changed:connect(function()
+		Shadow1.Size = gObj.Size + UDim2.new(0, size*2, 0, size*2)
+		Shadow2.Size = gObj.Size + UDim2.new(0, size*4, 0, size*4)
 	end)
 	
 	if cZIndex then return end
-	self.ZIndex = self.ZIndex+1
-	for i,v in next, self:GetDescendants()do
+	gObj.ZIndex = gObj.ZIndex+1
+	for i,v in next, gObj:GetDescendants()do
 		v.ZIndex = v.ZIndex+1
 	end
 end
@@ -165,34 +163,36 @@ function Tween(guiObject, props, tm)
 	return tween
 end
 
-function LoadVisuals(window)
-	AddShadow(window.Body.BodyBorder, 2, 0)
-	MakeDraggable(window, window)
+local function CreateTabControl(windowInfo, name, info, width, inColor, outColor, imgInColor, imgOutColor, clickColor, imgClickColor, connection)
+	local button = typeof(info) == "number" and Instance.new("ImageButton") or Instance.new("TextButton")
+	button.Size = UDim2.new(0, width, 0, 24)
+	button.Position = UDim2.new(0, windowInfo.window.Size.X.Offset-width, 0, 0)
+	button.BackgroundColor3 = outColor
+	button.BorderSizePixel = 0
+	button.Parent = windowInfo.window
+	button.ZIndex = 3
+	button.Name = name
+	if button:IsA("ImageButton")then
+		button.ScaleType = Enum.ScaleType.Fit
+		button.AutoButtonColor = false
+		button.Image = "rbxassetid://"..info
+	else
+		button.Text = info
+	end
+	
+	--connections
+	AddHovering(button, inColor, outColor, imgInColor, imgOutColor, clickColor, imgClickColor, 0.05, 0.25)
+	button.MouseButton1Click:connect(function()
+		connection(button)
+		local leave = button:IsA("ImageButton") and {BackgroundColor3 = outColor, ImageColor3 = imgOutColor} or {BackgroundColor3 = outColor, TextColor3 = imgOutColor}
+		Tween(button, leave, 0.25)
+	end)
+	table.insert(windowInfo.TabControls, button)
+	windowInfo:UpdateTabControls()
+	return button
 end
 
-local WindowProps = {}
-function WindowProps.UpdateTabControls()
-	local window = self.window
-	local X = window.Size.X.Offset
-	for i,v in next, self.TabControls do
-		if X ~= window.Size.X.Offset then X = X - 2 end
-		X = X - v.Size.X.Offset
-		v.Position = UDim2.new(0, X, 0, v.Position.Y.Offset)
-	end
-end
-function WindowProps.UpdateUI()
-	local window = self.window
-	if not self.closing then window.Size = UDim2.new(0, Body.Size.X.Offset, 0, 24)end
-	window.Body.BodyBorder.Size = UDim2.new(0, window.Size.X.Offset, 0, self.closing and window.Size.Y.Offset or window.Body.Size.Y.Offset + 24)
-	window.WindowIcon.Size = UDim2.new(0, window.WindowIcon.Size.X.Offset, 0, window.Size.Y.Offset)
-	window.WindowTitle.Size = UDim2.new(0, window.WindowTitle.Size.X.Offset, 0, window.Size.Y.Offset)
-	for i,tab in next, self.TabControls do
-		tab.Size = UDim2.new(0, tab.Size.X.Offset, 0, window.Size.Y.Offset)
-	end
-	self:UpdateTabControls()
-end
-function WindowProps.AddHovering(inColor, outColor, scnInColor, scnOutColor, clickColor, scnClickColor, inTime, outTime)
-	local button = self
+function AddHovering(button, inColor, outColor, scnInColor, scnOutColor, clickColor, scnClickColor, inTime, outTime)
 	button.AutoButtonColor = false
 	local enter = button:IsA("ImageButton") and {BackgroundColor3 = inColor, ImageColor3 = scnInColor} or {BackgroundColor3 = inColor , TextColor3 = scnInColor}
 	local leave = button:IsA("ImageButton") and {BackgroundColor3 = outColor, ImageColor3 = scnOutColor} or {BackgroundColor3 = outColor, TextColor3 = scnOutColor}
@@ -219,27 +219,77 @@ function WindowProps.AddHovering(inColor, outColor, scnInColor, scnOutColor, cli
 	Tween(button, leave, isMouseDown and 0 or outTime)
 end
 
+function LoadVisuals(window)
+	AddShadow(window.BodyBorder, 2, 0)
+	MakeDraggable(window, window)
+end
+
+local WindowProps = {}
+function WindowProps:UpdateTabControls()
+	local window = self.window
+	local X = window.Size.X.Offset
+	for i,v in next, self.TabControls do
+		if X ~= window.Size.X.Offset then X = X - 2 end
+		X = X - v.Size.X.Offset
+		v.Position = UDim2.new(0, X, 0, v.Position.Y.Offset)
+	end
+end
+function WindowProps:UpdateUI()
+	local window = self.window
+	if not self.closing then window.Size = UDim2.new(0, window.Body.Size.X.Offset, 0, 24)end
+	window.BodyBorder.Size = UDim2.new(0, window.Size.X.Offset, 0, self.closing and window.Size.Y.Offset or window.Body.Size.Y.Offset + 24)
+	window.WindowIcon.Size = UDim2.new(0, window.WindowIcon.Size.X.Offset, 0, window.Size.Y.Offset)
+	window.WindowTitle.Size = UDim2.new(0, window.WindowTitle.Size.X.Offset, 0, window.Size.Y.Offset)
+	for i,tab in next, self.TabControls do
+		tab.Size = UDim2.new(0, tab.Size.X.Offset, 0, window.Size.Y.Offset)
+	end
+	self:UpdateTabControls()
+end
+
 local WindowPrefs = {}
 WindowPrefs.UIColors = UIColors
 WindowPrefs.AddShadow = AddShadow
 WindowPrefs.MakeDraggable = MakeDraggable
 
 function WindowPrefs:CreateWindow(title, size, iconId)
-	local closing = false
 	local windowScreen = WindowScreen:Clone()
 	local window = windowScreen.Window
 	windowScreen.Parent = game.CoreGui
 	window.WindowTitle.Text = title
 	window.WindowIcon.Image = "rbxassetid://"..iconId
+	window.Body.Size = UDim2.new(0, size.X, 0, size.Y)
 	
-	local windowInfo = {window = window, closing = closing, TabControls = {}}
+	--> Configure the window with the WindowProps functions
+	local windowInfo = {window = window, closing = false, TabControls = {}}
 	setmetatable(windowInfo, {__index = WindowProps})
+	
+	--> Configure buttons
+	local clicked = false
+	CreateTabControl(windowInfo, "Close", 4191392901, 24, Color3.fromRGB(220, 0, 0), UIColors.PrimaryColor, Color3.new(0,0,0), Color3.new(1,1,1), Color3.fromRGB(255, 0, 0), Color3.new(0,0,0), function(self)
+		if clicked then return end
+		clicked = true
+		Tween(window.Body, {Size = UDim2.new(0,window.Body.Size.X.Offset,0,0)}, 0.3).Completed:Wait()
+		windowInfo.closing = true
+		Tween(window, {Size = UDim2.new(0,window.Body.Size.X.Offset,0,0)}, 0.2).Completed:Wait()
+		windowScreen:Destroy()
+	end)
+	CreateTabControl(windowInfo, "Minimize", 4154771750, 24, Color3.fromRGB(40, 40, 40), UIColors.PrimaryColor, Color3.new(1,1,1), Color3.new(1,1,1), Color3.fromRGB(60, 60, 60), Color3.new(1,1,1), function(self)
+		local visible = window.Body.Size.Y.Offset > 0
+		if visible then
+			Tween(window.Body, {Size = UDim2.new(0, 200, 0, 0)}, 0.25)
+		else
+			Tween(window.Body, {Size = UDim2.new(0, size.X, 0, size.Y)}, 0.25)
+		end wait(0.03)
+	end)
+	
+	windowInfo:UpdateUI()
 	window.Body.Changed:connect(function()
 		windowInfo:UpdateUI()
 	end)
 	window.Changed:connect(function()
 		windowInfo:UpdateUI()
 	end)
+	LoadVisuals(windowInfo.window)
 	return windowInfo
 end
 return WindowPrefs
