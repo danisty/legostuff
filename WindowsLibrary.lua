@@ -12,15 +12,6 @@ local Colors = {
 	PrimaryColor = Color3.fromRGB(25, 25, 25),
 	SecondaryColor = Color3.fromRGB(35, 35, 35)	
 }
-local UIColors = newproxy(true)
-local mt = getmetatable(UIColors)
-mt.__index = Colors
-mt.__newindex = function(self, key, val)
-	Colors[key] = val
-	Window.BackgroundColor3 = UIColors.PrimaryColor
-	Body.BackgroundColor3 = UIColors.SecondaryColor
-	BodyBorder.BackgroundColor3 = UIColors.SecondaryColor
-end
 
 WindowScreen.Name = "ScriptSpy"
 WindowScreen.ResetOnSpawn = false
@@ -260,7 +251,16 @@ function WindowPrefs:CreateWindow(title, size, iconId)
 	window.Body.Size = UDim2.new(0, size.X, 0, size.Y)
 	
 	--> Configure the window with the WindowProps functions
-	local windowInfo = {window = window, closing = false, TabControls = {}}
+	local UIColors = newproxy(true)
+	local mt = getmetatable(UIColors)
+	mt.__index = Colors
+	mt.__newindex = function(self, key, val)
+		Colors[key] = val
+		Window.BackgroundColor3 = UIColors.PrimaryColor
+		Body.BackgroundColor3 = UIColors.SecondaryColor
+		BodyBorder.BackgroundColor3 = UIColors.SecondaryColor
+	end
+	local windowInfo = {window = window, closing = false, TabControls = {}, UIColors = UIColors}
 	setmetatable(windowInfo, {__index = WindowProps})
 	
 	--> Configure buttons
