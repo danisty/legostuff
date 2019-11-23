@@ -224,7 +224,7 @@ WindowPrefs.UIColors = UIColors
 WindowPrefs.AddShadow = AddShadow
 WindowPrefs.MakeDraggable = MakeDraggable
 
-function WindowPrefs:CreateWindow(title, iconId, size)
+function WindowPrefs:CreateWindow(title, size, iconId)
 	local closing = false
 	local window = WindowScreen:Clone().Window
 	window.WindowTitle.Text = title
