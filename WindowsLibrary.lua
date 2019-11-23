@@ -256,9 +256,9 @@ function WindowPrefs:CreateWindow(title, size, iconId)
 	mt.__index = UIColors
 	mt.__newindex = function(self, key, val)
 		UIColors[key] = val
-		Window.BackgroundColor3 = UIColors.PrimaryColor
-		Body.BackgroundColor3 = UIColors.SecondaryColor
-		BodyBorder.BackgroundColor3 = UIColors.SecondaryColor
+		window.BackgroundColor3 = UIColors.PrimaryColor
+		window.Body.BackgroundColor3 = UIColors.SecondaryColor
+		window.BodyBorder.BackgroundColor3 = UIColors.SecondaryColor
 	end
 	local windowInfo = {window = window, closing = false, TabControls = {}, UIColors = Colors}
 	setmetatable(windowInfo, {__index = WindowProps})
