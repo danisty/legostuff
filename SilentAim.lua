@@ -1,10 +1,10 @@
 local gmt, rmt = getrawmetatable(game), getrawmetatable(Ray.new(Vector3.new(), Vector3.new()))
 setreadonly(gmt, false) setreadonly(rmt, false)
 local goldin = gmt.__index
+local goldnc = gmt.__namecall
 local roldin = rmt.__index
 local rayn;
 
-local can = true
 local players = game:GetService('Players')
 local camera = workspace.CurrentCamera
 local mouse = players.LocalPlayer:GetMouse()
@@ -38,6 +38,30 @@ local function getClosestPlayer()
     return {plr, vect}
 end
 
+local function createWhitelist()
+	local succ, data = pcall(getClosestPlayer)
+	if not succ or not data[1] then return ret end
+
+	local whitelist = {}
+	for i,v in pairs(data[1].Character:GetDescendants())do
+		if v:IsA('BasePart') then
+			table.insert(whitelist, v)
+		end
+	end
+	return whitelist
+end
+
+local raycasting = {FindPartOnRay = true, FindPartOnRayWithIgnoreList = true, FindPartOnRayWithWhitelist = true}
+gmt.__namecall = function(self, ...)
+	local method = getnamecallmethod()
+	local args = {...}
+	if raycasting[method] and getfenv(2).script ~= script and getfenv(2).script.Name ~= 'Popper' then
+		local target = mouse.Target
+		if target then return target, mouse.Hit.p, target.Material end
+	end
+	return goldnc(self, ...)
+end
+
 gmt.__index = function(self, key)
 	local ret = goldin(self, key)
 	if (self == mouse or goldin(self, 'Parent') == nil) and log[key:lower()] then 
@@ -60,7 +84,7 @@ end
 
 rmt.__index = function(self, key)
 	local origin = roldin(self, 'Origin')
-	local direction = CFrame.new(origin, mouse.Hit.p).lookVector
+	local direction = (mouse.Hit.p - origin).unit * 999
 	if key:lower() == 'unit' then
 		return roldin(rayn(origin, direction), 'Unit')
 	elseif key:lower() == 'direction' then
@@ -70,7 +94,7 @@ rmt.__index = function(self, key)
 end
 
 rayn = hookfunction(Ray.new, function(org, dir)
-	if isNearPlayer(org)then
+	if (isNearPlayer(org) and getfenv(2).script.Name ~= 'CameraModule') or getfenv(2).script == script then
 		return rayn(org, (mouse.Hit.p - org).unit * 999)
 	end
 	return rayn(org, dir)
