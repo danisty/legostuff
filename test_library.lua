@@ -189,10 +189,12 @@ local function openHandler(self)
 	
 	table.insert(HandlersHistory, self)
 	self.Handler.Parent = Handler
+	BackBtn.Visible = self.CanReturn
 end
 
 local function closeHandler(self)
 	self = self or HandlersHistory[#HandlersHistory]
+	if not self or #HandlersHistory == 1 then return end
 	self.Handler.Parent = nil
 	
 	HandlersHistory[#HandlersHistory] = nil
@@ -298,7 +300,7 @@ local function createOptionsHandler(title, canReturn)
 		OptionArrow.TextXAlignment = Enum.TextXAlignment.Left
 	end
 	
-	function controls:CreateSlider(title, actualValue, minValue, maxValue)
+	function controls:CreateSlider(title, actualValue, minValue, maxValue, connection)
 		local Slider = Instance.new("Frame")
 		local SliderBackground = Instance.new("ImageLabel")
 		local SliderFill = Instance.new("ImageLabel")
@@ -331,7 +333,7 @@ local function createOptionsHandler(title, canReturn)
 		SliderFill.Parent = SliderBackground
 		SliderFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		SliderFill.BackgroundTransparency = 1
-		SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+		SliderFill.Size = UDim2.new(actualValue / maxValue, 0, 1, 0)
 		SliderFill.Image = "rbxassetid://3570695787"
 		SliderFill.ImageTransparency = 0.20000000298023
 		SliderFill.ScaleType = Enum.ScaleType.Slice
@@ -342,7 +344,7 @@ local function createOptionsHandler(title, canReturn)
 		SliderDot.Parent = SliderBackground
 		SliderDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 		SliderDot.BackgroundTransparency = 1
-		SliderDot.Position = UDim2.new(0.5, -5, 0, -2)
+		SliderDot.Position = UDim2.new(actualValue / maxValue, -5, 0, -2)
 		SliderDot.Size = UDim2.new(0, 10, 0, 10)
 		SliderDot.Image = "rbxassetid://3570695787"
 		SliderDot.ScaleType = Enum.ScaleType.Slice
@@ -370,9 +372,26 @@ local function createOptionsHandler(title, canReturn)
 		SliderText.TextColor3 = Color3.fromRGB(202, 202, 202)
 		SliderText.TextSize = 12
 		SliderText.TextXAlignment = Enum.TextXAlignment.Left
+		
+		local connection = connection or function()end
+		SliderBackground.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				while UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)do wait()
+					local position = UDim2.new(math.clamp((Mouse.X - SliderBackground.AbsolutePosition.X) / SliderBackground.AbsoluteSize.X, 0, 1), 0, 1, 0)
+					local value = math.floor(position.X.Scale * (maxValue - minValue) + minValue)
+					
+					SliderDot:TweenPosition(UDim2.new(position.X.Scale, -5, 0, -2), Enum.EasingDirection.InOut, Enum.EasingStyle.Quad, 0.05, true)
+					SliderFill:TweenSize(UDim2.new(position.X.Scale, 0, 1, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Quad, 0.05, true)
+					SliderValue.Text = tostring(value)..'/'..maxValue
+					
+					connection(value)
+				end
+			end
+		end)
 	end
 	
 	Handlers[title] = controls
+	if #HandlersHistory == 0 then openHandler(controls) end
 	return setmetatable(controls, {__index = {Close = closeHandler, Open = openHandler}})
 end
 
@@ -383,4 +402,5 @@ Library.CreateMessage = createMessage
 Library.CreateBavel = createBavel
 Library.CreateOptionsHandler = createOptionsHandler
 Library.MakeDraggable = makeDraggable
+
 return Library
