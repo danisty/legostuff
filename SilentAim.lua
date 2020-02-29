@@ -553,11 +553,11 @@ local function initialize()
 	end)
 end
 
-local Main = createOptionsHandler("MAIN", false)
-Main:Open()
+local main = createOptionsHandler("MAIN", false)
+main:Open()
 
-Main:CreateOption("Advanced Settings")
-Main:CreateSlider("Sensitivity", 10, 0, 50, function(value)
+main:CreateOption("Advanced Settings")
+main:CreateSlider("Sensitivity", 10, 0, 50, function(value)
 	sensitivity = value
 end)
 
