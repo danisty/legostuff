@@ -1,10 +1,10 @@
 return {
 	{
-		Name = 'Remote Spy'
+		Name = 'Remote Spy',
 		Directory = 'tools/RemoteSpy'
 	},
 	{
-		Name = 'Environment Editor'
+		Name = 'Environment Editor',
 		Directory = 'tools/EnvironmentEditor'
 	}
 }
