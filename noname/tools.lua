@@ -1,11 +1,10 @@
-local dir = 'https://github.com/danisty/legostuff/noname/'
 return {
 	{
 		Name = 'Remote Spy'
-		Directory = dir .. 'RemoteSpy'
+		Directory = 'tools/RemoteSpy'
 	},
 	{
 		Name = 'Environment Editor'
-		Directory = dir .. 'EnvironmentEditor'
+		Directory = 'tools/EnvironmentEditor'
 	}
 }
