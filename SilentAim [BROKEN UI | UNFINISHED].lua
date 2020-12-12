@@ -2,7 +2,7 @@
 	Date of creation: Unknown
 	Creator: danisty§#9161
 	
-	Info: A global SilentAim which should work on most FPS. The UI is unfinished so you will have to manually change the sensitivity.
+	Info: A global SilentAim which should work on most FPS. The UI is unfinished so you will have to manually change the settings.
 	"This will someday get an update" - lazy danisty
 ]]
 
@@ -464,7 +464,7 @@ local roldin = rmt.__index
 local rayn;
 
 local enabled = true
-local modifyRaycasts = false
+local modifyRaycasts = false --> This one is broken. It's an easy fix so I'm sure you can deal with it.
 local modifyTarget = true
 local modifyRays = true
 local sensitivity = 0
