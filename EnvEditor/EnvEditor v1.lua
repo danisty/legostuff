@@ -2,7 +2,7 @@
 	Date of creation: 24/3/2019-24/6/2019 - I don't remember the exact date of creation, this is an assumption from old discord conversations.
 	Creator: danisty§#9161
 	
-	Info: This version was created for only reason of learning and mostly my laziness, some things require the use of keys combinations which I may write down later.
+	Info: This version was created for learning purposes, some things require the use of keys combinations which I may write down later.
 	A newer version is coming probably by new year!
 ]]
 
