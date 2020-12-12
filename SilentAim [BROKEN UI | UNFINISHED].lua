@@ -1,3 +1,11 @@
+--[[
+	Date of creation: Unknown
+	Creator: danisty§#9161
+	
+	Info: A global SilentAim which should work on most FPS. The UI is unfinished so you will have to manually change the sensitivity.
+	"This will someday get an update" - lazy danisty
+]]
+
 local SilentAim = Instance.new("ScreenGui")
 local Main = Instance.new("Frame")
 local Bevel1 = Instance.new("Frame")
