@@ -394,8 +394,6 @@ local SP = 2
 local UVP = 1
 local LFunc = ""
 local keydown = false
-local Buttons = {}
-local RButtons = {}
 local UVButtons = {}
 local CFunc = ""
 local LFName = ""
@@ -406,10 +404,38 @@ local Funcs = {}
 local SFuncs = {}
 local AFunc = nil
 local AScript = nil
+local lastSearchKeyword = nil
 local nilscript = "function GetInst(inst)\n	for i,v in next, getnilinstances()do\n		if v.Name and v.Name == inst then\n			return v\n		end\n	end\nend\n"
 local tobj = Instance.new("Part", workspace)
 tobj.CanCollide = false
 tobj.Transparency = 1
+
+--// Update after 1.5 year wow
+local scripts = {}
+
+local function UpdateScripts(searchKeyword)
+	local filteredScripts = scripts
+	lastSearchKeyword = searchKeyword
+	if searchKeyword then
+		filteredScripts = {}
+		for i,v in pairs(scripts) do
+			if v.Text:lower():find(searchKeyword:lower()) then
+				table.insert(filteredScripts, v)
+			end
+		end
+	end
+	ScriptsSFrm.CanvasSize = UDim2.new(0, 0, 0, #filteredScripts*22 + 2)
+	for i,v in pairs(scripts) do
+		v.Parent = nil
+		local i = table.find(filteredScripts, v)
+		if i then
+			v.Position = UDim2.new(0, 2, 0, (i-1)*22 + 2)
+		end
+		if i and v.Position.Y.Offset > ScriptsSFrm.CanvasPosition.Y - 40 and  v.Position.Y.Offset < ScriptsSFrm.CanvasPosition.Y + ScriptsSFrm.AbsoluteSize.Y + 40 then
+			v.Parent = ScriptsSFrm
+		end
+	end
+end
 
 function Message(title, msg, duration)
 	game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -434,16 +460,6 @@ local function CheckModule(mod)
 			return true
 		end
 	end
-end
-
-local function ClearScripts(search)
-	if not search then search = false end
-	for i,v in pairs(ScriptsSFrm:GetChildren())do
-		if v ~= ScriptBtn then
-		v:Destroy()end
-	end
-	if search then RButtons = {} else Buttons = {} end
-	SP = 2
 end
 
 local function ClearUV()
@@ -515,7 +531,7 @@ local function Convert(s)
 	elseif typeof(s) == "Color3" then
 		RetVal = "Color3.new(" .. st .. ")"
 	elseif typeof(s) == "NumberRange" then
-		RetVal = "NumberRange.new(" .. s:gsub("^%s*(.-)%s*$", "%1"):gsub(" ", ", ") .. ")"
+		RetVal = "NumberRange.new(" .. st:gsub("^%s*(.-)%s*$", "%1"):gsub(" ", ", ") .. ")"
 	elseif typeof(s) == "PhysicalProperties" then
 		RetVal = "PhysicalProperties.new(" .. st .. ")"
 	elseif typeof(s) == "table" then
@@ -532,14 +548,13 @@ end
 
 local function AddScriptButton(btn, color, disabled, search)
 	local b = ScriptBtn:Clone()
-	b.Parent = ScriptsSFrm
 	b.Text = btn.Name
-	b.Position = UDim2.new(0, 2, 0, SP)
 	b.TextColor3 = color
 	b.Visible = true
 	b.ScriptScrVl.Value = btn
-	SP = SP+22
-	if search then UpdateBtns(b, RButtons) else UpdateBtns(b, Buttons)end
+
+	table.insert(scripts, b)
+
 	b.MouseButton1Click:Connect(function()
 		local ret = btn
 		btn = tobj
@@ -707,13 +722,14 @@ local function CheckScript(scr)
 end
 
 local function LoadScripts()
-	ClearScripts()
+	scripts = {}
 	for i,v in pairs(game:GetDescendants())do
 		FilterScript(v)
 	end
 	for i,v in pairs(_G.NModules)do
 		FilterScript(v)
 	end
+	UpdateScripts()
 end
 
 function UpdateBtns(Btn, Btns)
@@ -741,7 +757,7 @@ local r = s
 local rr = ""
 local check = true
 repeat
-    if string.find(r.Name, " ") or string.find(r.Name, "*") or string.find(r.Name, "%d+") or string.find(r.Name, "-") or r.Name == ""then
+    if string.find(r.Name, " ") or string.find(r.Name, "*") or string.find(r.Name, "%d+") or string.find(r.Name, "-") or r.Name == "" then
 		local nr = r.Name
 		local pname = game.Players.LocalPlayer.Name
 		if pname == nr and r.Parent == game.Players then
@@ -932,7 +948,7 @@ function SearchScript(scr, clr)
 	clr = clr and clr or Color3.fromRGB(0, 50, 50)
 	if scr.Parent == nil or not done then done = true return end
 	done = false
-	for i,v in pairs(ScriptsSFrm:GetChildren())do
+	for i,v in pairs(scripts)do
 		if v.ScriptScrVl.Value == scr then
 			ScriptsSFrm.CanvasPosition = Vector2.new(0, v.Position.Y.Offset-66)
 			for i = 0,1,0.2 do
@@ -948,10 +964,8 @@ end
 
 function FilterScript(scr)
 	if scr:IsA("LocalScript")then
-		if not scr.Disabled and CheckScript(scr:GetFullName())then
-			AddScriptButton(scr, ScriptBtn.TextColor3)
-		elseif CheckScript(scr:GetFullName())then
-			AddScriptButton(scr, Color3.fromRGB(181, 17, 19), true)
+		if CheckScript(scr:GetFullName())then
+			AddScriptButton(scr, scr.Disabled and Color3.fromRGB(181, 17, 19) or ScriptBtn.TextColor3, scr.Disabled)
 		end
 	elseif scr:IsA("ModuleScript")then
 		if CheckScript(scr:GetFullName())then
@@ -960,58 +974,20 @@ function FilterScript(scr)
 	end
 end
 
-local function Search(v)
-	v = string.sub(v, 2, #v)
-	ClearScripts(true)
-	for i,s in pairs(Buttons)do
-		if string.find(s[1].Text:lower(), v:lower())then
-			local scr = s[2]
-			if scr:IsA("LocalScript")then
-				if not scr.Disabled and CheckScript(scr:GetFullName())then
-					AddScriptButton(scr, ScriptBtn.TextColor3, false, true)
-				elseif CheckScript(scr:GetFullName())then
-					AddScriptButton(scr, Color3.fromRGB(181, 17, 19), true, true)
-				end
-			elseif scr:IsA("ModuleScript")then
-				if CheckScript(scr:GetFullName())then
-					AddScriptButton(scr, Color3.fromRGB(99, 168, 158), false, true)
-				end
-			end
-		end
-	end
-end
-
-function Reload()
-	local NButtons = Buttons
-	ClearScripts()
-	for i,v in pairs(NButtons)do
-		local scr = v[2]
-		FilterScript(scr)
-	end
-end
-
 local function Load(dcmpl)
 	local scr = PathTxtB.Text
-	repeat
-		scr = string.gsub(scr, '%\91"', ".")
-		scr = string.gsub(scr, '"%\93', "")
-	until not string.find(scr, '%\91"') and not string.find(scr, '"%\93')
-	local path = nil
-	local check = {}
-	for v in string.gmatch(scr, "[^.]+") do
-		table.insert(check, v)
-	end
-	if scr == "" then Message("Error", "Invalid path!", 5)Reload()return end
-	local jo = true
+
 	if scr:sub(1,1) == '>' then
 		if scr:sub(2,#scr) == "getnils"then
 			_G.NModules = {}
 			local num = 0
 			for i,s in next, getnilinstances()do
-				local succ, fail = pcall(function()getsenv(s)end)
 				if s:IsA("ModuleScript") and CheckScript(s:GetFullName()) then
 					table.insert(_G.NModules, s)
 					num = num+1
+				end
+				if num%400 == 0 then
+					wait()
 				end
 			end
 			LoadScripts()
@@ -1019,12 +995,24 @@ local function Load(dcmpl)
 			return
 		end
 	end
+
+	repeat
+		scr = string.gsub(scr, '%\91"', ".")
+		scr = string.gsub(scr, '"%\93', "")
+	until not string.find(scr, '%\91"') and not string.find(scr, '"%\93')
+
+	local path = nil
+	local check = {}
+	for v in string.gmatch(scr, "[^.]+") do
+		table.insert(check, v)
+	end
+	if scr == "" then
+		Message("Error", "Invalid path!", 5)
+		return LoadScripts()
+	end
+
+	local jo = true
 	for i,v in pairs(check)do
-		Reload()
-		if v:sub(1,1) == '-' then
-			Search(v)
-			return
-		end
 		if v == 'game' or v == 'Game' and jo then
 			jo = false
 			path = game
@@ -1076,9 +1064,12 @@ local function Load(dcmpl)
 	end
 end
 
-PathTxtB.Changed:connect(function()
+PathTxtB.Changed:Connect(function()
 	if PathTxtB.Text:sub(1,1) == '-' then
-	Load(false)end
+		UpdateScripts(PathTxtB.Text:sub(2))
+	elseif PathTxtB.Text == "" then
+		UpdateScripts()
+	end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
@@ -1090,7 +1081,8 @@ MinBtn.MouseButton1Click:Connect(function()
 end)
 
 RefreshBtn.MouseButton1Click:Connect(function()
-	LoadScripts()
+	local searchKeyword = PathTxtB.Text:sub(1,1) == "-" and PathTxtB.Text:sub(2)
+	LoadScripts(searchKeyword)
 end)
 
 LoadBtn.MouseButton1Click:Connect(function()
@@ -1102,7 +1094,7 @@ LoadBtn.MouseButton2Click:Connect(function()
 end)
 
 EraseBtn.MouseButton1Click:Connect(function()
-	Reload()
+	lastSearchKeyword = nil
 	PathTxtB.Text = ""
 end)
 
@@ -1178,7 +1170,7 @@ local rdone = true
 BackBtn.MouseButton1Click:Connect(function()
 	if #Funcs-1 ~= 0 and rdone then
 		rdone = false
-		if typeof(Funcs[#Funcs]) == "function"then
+		if typeof(Funcs[#Funcs]) == "function" then
 			fn = fn-1
 		end
 		CFunc = SFuncs[#SFuncs-1]
@@ -1190,9 +1182,16 @@ BackBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+ScriptsSFrm.Changed:Connect(function(p)
+	if p == "CanvasPosition" then
+		UpdateScripts(lastSearchKeyword)
+	end
+end)
+
 game.Players.LocalPlayer:GetMouse().KeyDown:Connect(function(key)
 	if key == 'e' then
 		BodyFrm.Visible = not BodyFrm.Visible
 	end
 end)
 LoadScripts()
+getgenv().getups = getups
