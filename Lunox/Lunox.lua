@@ -53,7 +53,6 @@ CurrentResource.TextXAlignment = Enum.TextXAlignment.Left
 CurrentResource.TextYAlignment = Enum.TextYAlignment.Top
 
 --// Services
-local Mouse = game.Players.LocalPlayer:GetMouse()
 local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TweenService")
@@ -67,7 +66,10 @@ local modules, modulesInfo = {}, {
 }
 
 local function require(module)
-	return loadstring(game:HttpGet(baseUrl .. "/" .. HTTPS:UrlEncode(module)))()
+	local success, rawModule = pcall(function()
+		return game:HttpGet(baseUrl .. "/" .. HTTPS:UrlEncode(module))
+	end)
+	return success and loadstring(rawModule)()
 end
 
 local p, s = 1, table.getn(modules)
@@ -82,5 +84,4 @@ for module, info in pairs(modules) do
 end
 TempScreen:Destroy()
 
-local Library = modules.Library
-local EnvEditor = modules.EnvironmentEditor
+local MainWindow = modules.Library:CreateWindow(nil, Lunox)
