@@ -7,6 +7,12 @@ local Progress = Instance.new("Frame")
 local Bar = Instance.new("Frame")
 local CurrentResource = Instance.new("TextLabel")
 
+Lunox.Name = "Lunox"
+Lunox.Parent = game.CoreGui
+
+TempScreen.Name = "TempScreen"
+TempScreen.Parent = Lunox
+
 Loading.Name = "Loading"
 Loading.Parent = TempScreen
 Loading.BackgroundColor3 = Color3.fromRGB(27, 27, 27)
@@ -36,7 +42,7 @@ Bar.Name = "Bar"
 Bar.Parent = Progress
 Bar.BackgroundColor3 = Color3.fromRGB(30, 136, 229)
 Bar.BorderSizePixel = 0
-Bar.Size = UDim2.new(0.5, 0, 0, 5)
+Bar.Size = UDim2.new(0, 0, 0, 5)
 
 CurrentResource.Name = "CurrentResource"
 CurrentResource.Parent = Loading
@@ -61,27 +67,37 @@ local HTTPS = game:GetService("HttpService")
 --// Loader
 local baseUrl = "https://raw.githubusercontent.com/danisty/legostuff/master/Lunox/"
 local modules, modulesInfo = {}, {
-	["Library.lua"] = "[UI] Loading library.",
-	["EnvironmentEditor.lua"] = "[Tools] Loading Environment Editor."
+	["Library"] = "[UI] Loading library.",
+	["EnvironmentEditor"] = "[Tools] Loading Environment Editor."
 }
+
+local function getSize(t)
+	local c = 0
+	for i,v in pairs(t) do
+		c = c + 1
+	end
+	return c
+end
 
 local function require(module)
 	local success, rawModule = pcall(function()
 		return game:HttpGet(baseUrl .. "/" .. HTTPS:UrlEncode(module))
 	end)
-	return success and loadstring(rawModule)()
+	return success and loadstring(rawModule)(modules)
 end
 
-local p, s = 1, table.getn(modules)
-for module, info in pairs(modules) do
+local p, s = 1, getSize(modulesInfo)
+for module, info in pairs(modulesInfo) do
 	CurrentResource.Text = info
 	TS:Create(Bar, TweenInfo.new(.2, Enum.EasingStyle.Linear), {
 		Size=UDim2.new(p/s, 0, 0, 5)
 	}):Play()
 
-	modules[module:sub(1, -3)] = require(module)
+	modules[module] = require(module .. ".lua")
 	p = p + 1
 end
 TempScreen:Destroy()
 
-local MainWindow = modules.Library:CreateWindow(nil, Lunox)
+--// Interface
+local MainWindow = modules.Library:Window("LUNOX", 6865413952, nil, Lunox)
+local TabControl = module.Library:TabControl(MainWindow.__Instance.Main.Body)

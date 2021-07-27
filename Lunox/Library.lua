@@ -4,7 +4,8 @@ local RS = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TS = game:GetService("TweenService")
 
-local Library = {}
+local library = {}
+local modules = ...
 
 local function inArea(gO)
 	return Mouse.X >= gO.AbsolutePosition.X and Mouse.X <= gO.AbsolutePosition.X + gO.AbsoluteSize.X
@@ -67,16 +68,10 @@ local function setHovering(gO, properties, colorRetriever, tweenDelay)
 	end)
 end
 
-function Library:CreateWindow(tools, parent)
+function library:Window(title, icon, tools, parent)
 	local Window = Instance.new("ScreenGui")
 	local Main = Instance.new("Frame")
 	local Body = Instance.new("Frame")
-	local TabContent = Instance.new("Frame")
-	local Lost = Instance.new("TextLabel")
-	local Tabs = Instance.new("ScrollingFrame")
-	local TabsLayout = Instance.new("UIListLayout")
-	local TabPlaceHolder = Instance.new("Frame")
-	local TabsDropShadow = Instance.new("Frame")
 	local TitleBar = Instance.new("Frame")
 	local Icon = Instance.new("ImageLabel")
 	local Title = Instance.new("TextLabel")
@@ -84,8 +79,6 @@ function Library:CreateWindow(tools, parent)
 	local Maximize = Instance.new("ImageButton")
 	local Minimize = Instance.new("ImageButton")
 	local Tab = Instance.new("TextButton")
-
-    local methods = {}
 	
 	Window.Name = "Window"
 	Window.Parent = parent
@@ -107,54 +100,6 @@ function Library:CreateWindow(tools, parent)
 	Body.Position = UDim2.new(0, 0, 0, 30)
 	Body.Size = UDim2.new(1, 0, 1, -30)
 
-	TabContent.Name = "TabContent"
-	TabContent.Parent = Body
-	TabContent.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	TabContent.BackgroundTransparency = 1.000
-	TabContent.Position = UDim2.new(0, 0, 0, 30)
-	TabContent.Size = UDim2.new(1, 0, 1, -30)
-
-	Lost.Name = "Lost"
-	Lost.Parent = TabContent
-	Lost.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	Lost.BackgroundTransparency = 1.000
-	Lost.Position = UDim2.new(0, 10, 0, 10)
-	Lost.Size = UDim2.new(1, -10, 1, -10)
-	Lost.Font = Enum.Font.SourceSans
-	Lost.Text = "<font size=\"24\">Welcome to Lunox!</font><br/><font color=\"#999999\">It seems that you got kinda lost here. You might be looking for the<font color=\"#42a5f5\"> Tools </font>menu option.\n\nMore detailed description here</font>"
-	Lost.TextColor3 = Color3.fromRGB(181, 181, 181)
-	Lost.TextSize = 16.000
-	Lost.TextWrapped = true
-	Lost.RichText = true
-	Lost.TextXAlignment = Enum.TextXAlignment.Left
-	Lost.TextYAlignment = Enum.TextYAlignment.Top
-	
-	Tabs.Name = "Tabs"
-	Tabs.Parent = Body
-	Tabs.Active = true
-	Tabs.BackgroundColor3 = Color3.fromRGB(27, 27, 27)
-	Tabs.BorderSizePixel = 0
-	Tabs.Size = UDim2.new(1, 0, 0, 30)
-	Tabs.ZIndex = 2
-	Tabs.CanvasSize = UDim2.new(0, 180, 0, 0)
-	Tabs.ScrollBarThickness = 0
-
-	TabsLayout.Parent = Tabs
-	TabsLayout.FillDirection = Enum.FillDirection.Horizontal
-	TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-	TabPlaceHolder.Name = "TabPlaceHolder"
-	TabPlaceHolder.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	TabPlaceHolder.BorderSizePixel = 0
-	TabPlaceHolder.Size = UDim2.new(0, 180, 0, 30)
-
-	TabsDropShadow.Name = "TabsDropShadow"
-	TabsDropShadow.Parent = Body
-	TabsDropShadow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	TabsDropShadow.BorderSizePixel = 0
-	TabsDropShadow.Size = UDim2.new(1, 0, 0, 33)
-	TabsDropShadow.Style = Enum.FrameStyle.DropShadow
-
 	TitleBar.Name = "TitleBar"
 	TitleBar.Parent = Main
 	TitleBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -167,7 +112,7 @@ function Library:CreateWindow(tools, parent)
 	Icon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	Icon.BackgroundTransparency = 1.000
 	Icon.Size = UDim2.new(0, 30, 0, 30)
-	Icon.Image = "rbxassetid://6865413952"
+	Icon.Image = "rbxassetid://" .. icon
 
 	Title.Name = "Title"
 	Title.Parent = TitleBar
@@ -176,7 +121,7 @@ function Library:CreateWindow(tools, parent)
 	Title.Position = UDim2.new(0, 30, 0, 0)
 	Title.Size = UDim2.new(0, 0, 0, 30)
 	Title.Font = Enum.Font.SourceSansSemibold
-	Title.Text = "LUNOX"
+	Title.Text = title
 	Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 	Title.TextSize = 16.000
 	Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -207,14 +152,116 @@ function Library:CreateWindow(tools, parent)
 	Minimize.Size = UDim2.new(0, 40, 0, 30)
 	Minimize.Image = "rbxassetid://6875921379"
 	Minimize.ScaleType = Enum.ScaleType.Fit
+
+    local window = {
+        __Instance=Window,
+        Maximized=false,
+        Minimized=false
+    }
+    local lastSize = Main.Size
+    local lastPosition = Main.Position
+
+    function window:Minimize()
+        window.Minimized = not window.Minimized
+    end
+    function window:Maximize()
+        window.Maximized = not window.Maximized
+        Main.Size = window.Maximized and UDim2.new(1, 0, 1, 0) or lastSize
+        Main.Position = window.Maximized and UDim2.new(0, 0, 0, 0) or lastPosition
+    end
+    function window:Close()
+        if modules then
+            for _,module in pairs(modules) do
+                module:Unload()
+            end
+        end
+        Window:Destroy()
+    end
+
+    Main.Changed:Connect(function(p)
+        if p == "Size" then
+            lastSize = Main.Position
+        elseif p == "Position" then
+            lastPosition = Main.Position
+        end
+    end)
 	
-	local tabs = {}
+	makeDraggable(Main, TitleBar)
+    return window
+end
+
+function library:TabControl(parent)
+    local TabControl = Instance.new("Frame")
+    local TabContent = Instance.new("Frame")
+	local Lost = Instance.new("TextLabel")
+	local Tabs = Instance.new("ScrollingFrame")
+	local TabsLayout = Instance.new("UIListLayout")
+	local TabPlaceHolder = Instance.new("Frame")
+	local TabsDropShadow = Instance.new("Frame")
+
+    TabControl.Name = "TabControl"
+	TabControl.Parent = parent
+	TabControl.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TabControl.BackgroundTransparency = 1.000
+	TabControl.Position = UDim2.new(0, 0, 0, 30)
+	TabControl.Size = UDim2.new(1, 0, 1, 0)
+
+    TabContent.Name = "TabContent"
+	TabContent.Parent = TabControl
+	TabContent.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TabContent.BackgroundTransparency = 1.000
+	TabContent.Position = UDim2.new(0, 0, 0, 30)
+	TabContent.Size = UDim2.new(1, 0, 1, -30)
+
+	Lost.Name = "Lost"
+	Lost.Parent = TabContent
+	Lost.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Lost.BackgroundTransparency = 1.000
+	Lost.Position = UDim2.new(0, 10, 0, 10)
+	Lost.Size = UDim2.new(1, -10, 1, -10)
+	Lost.Font = Enum.Font.SourceSans
+	Lost.Text = "<font size=\"24\">Welcome to Lunox!</font><br/><font color=\"#999999\">It seems that you got kinda lost here. You might be looking for the<font color=\"#42a5f5\"> Tools </font>menu option.\n\nMore detailed description here</font>"
+	Lost.TextColor3 = Color3.fromRGB(181, 181, 181)
+	Lost.TextSize = 16.000
+	Lost.TextWrapped = true
+	Lost.RichText = true
+	Lost.TextXAlignment = Enum.TextXAlignment.Left
+	Lost.TextYAlignment = Enum.TextYAlignment.Top
+	
+	Tabs.Name = "Tabs"
+	Tabs.Parent = TabControl
+	Tabs.Active = true
+	Tabs.BackgroundColor3 = Color3.fromRGB(27, 27, 27)
+	Tabs.BorderSizePixel = 0
+	Tabs.Size = UDim2.new(1, 0, 0, 30)
+	Tabs.ZIndex = 2
+	Tabs.CanvasSize = UDim2.new(0, 180, 0, 0)
+	Tabs.ScrollBarThickness = 0
+
+	TabsLayout.Parent = Tabs
+	TabsLayout.FillDirection = Enum.FillDirection.Horizontal
+	TabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	TabPlaceHolder.Name = "TabPlaceHolder"
+	TabPlaceHolder.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	TabPlaceHolder.BorderSizePixel = 0
+	TabPlaceHolder.Size = UDim2.new(0, 180, 0, 30)
+
+	TabsDropShadow.Name = "TabsDropShadow"
+	TabsDropShadow.Parent = Body
+	TabsDropShadow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TabsDropShadow.BorderSizePixel = 0
+	TabsDropShadow.Size = UDim2.new(1, 0, 0, 33)
+	TabsDropShadow.Style = Enum.FrameStyle.DropShadow
+
+    local tabs = {}
 	local selectedTab;
 	
 	local function selectTab(tab)
 		for i,v in pairs(tabs) do
-			v.Title.TextColor3 = v==tab and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
-			v.BackgroundColor3 = v==tab and Color3.fromRGB(33, 33, 33) or Color3.fromRGB(27, 27, 27)
+			v.Tab.Title.TextColor3 = v.Tab==tab and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
+			v.Tab.BackgroundColor3 = v.Tab==tab and Color3.fromRGB(33, 33, 33) or Color3.fromRGB(27, 27, 27)
+            v.Content.Parent = v.Tab==tab and TabContent or nil
 		end
 		selectedTab = tab
 	end
@@ -286,7 +333,7 @@ function Library:CreateWindow(tools, parent)
 							--// Order tabs, homemade method, probably not recommended
 							local tabsSorted = {}
 							for i,v in pairs(tabs) do
-								table.insert(tabsSorted, {v, v==Tab and (v.AbsolutePosition.X + v.AbsoluteSize.X/2) - Body.AbsolutePosition.X or (i-1)*Tab.AbsoluteSize.X + Tab.AbsoluteSize.X/2})
+								table.insert(tabsSorted, {v, v.Tab==Tab and (v.Tab.AbsolutePosition.X + v.Tab.AbsoluteSize.X/2) - Body.AbsolutePosition.X or (i-1)*Tab.AbsoluteSize.X + Tab.AbsoluteSize.X/2})
 							end
 							table.sort(tabsSorted, function(v1, v2)
 								return v1[2] < v2[2]
@@ -294,7 +341,7 @@ function Library:CreateWindow(tools, parent)
 							for i,v in pairs(tabsSorted) do
 								tabs[i] = v[1]
 								tabs[i].LayoutOrder = i
-								if v[1] == Tab then
+								if v[1].Tab == Tab then
 									TabPlaceHolder.LayoutOrder = i
 								end
 							end
@@ -327,11 +374,8 @@ function Library:CreateWindow(tools, parent)
 			}
 		end)
 
-		table.insert(tabs, Tab)
+		table.insert(tabs, {Tab=Tab, Content=content})
 		Tab.LayoutOrder = #tabs
 	end
-	
-	makeDraggable(Main, TitleBar)
-    return methods
 end
-return Library
+return library
