@@ -1,4 +1,4 @@
-local Lunox = Instance.new("Folder")
+local Lunox = game.CoreGui:FindFirstChild("Lunox") or Instance.new("Folder")
 local TempScreen = Instance.new("ScreenGui")
 
 local Loading = Instance.new("Frame")
@@ -6,6 +6,7 @@ local LoadingTitle = Instance.new("TextLabel")
 local Progress = Instance.new("Frame")
 local Bar = Instance.new("Frame")
 local CurrentResource = Instance.new("TextLabel")
+local Default = Instance.new("TextLabel")
 
 Lunox.Name = "Lunox"
 Lunox.Parent = game.CoreGui
@@ -29,7 +30,7 @@ LoadingTitle.Size = UDim2.new(1, 0, 0, 25)
 LoadingTitle.Font = Enum.Font.SourceSansLight
 LoadingTitle.Text = "Now Loading"
 LoadingTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-LoadingTitle.TextSize = 20.000
+LoadingTitle.TextSize = 20
 
 Progress.Name = "Progress"
 Progress.Parent = Loading
@@ -52,11 +53,26 @@ CurrentResource.Position = UDim2.new(0, 5, 0, 27)
 CurrentResource.Selectable = true
 CurrentResource.Size = UDim2.new(1, -5, 0, 21)
 CurrentResource.Font = Enum.Font.SourceSans
-CurrentResource.Text = "Loading extra UI Controls"
+CurrentResource.Text = "If you see this, something went wrong."
 CurrentResource.TextColor3 = Color3.fromRGB(150, 150, 150)
 CurrentResource.TextSize = 17.000
 CurrentResource.TextXAlignment = Enum.TextXAlignment.Left
 CurrentResource.TextYAlignment = Enum.TextYAlignment.Top
+
+Default.Name = "Default"
+Default.Parent = TabContent
+Default.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Default.BackgroundTransparency = 1.000
+Default.Position = UDim2.new(0, 6, 0, -10)
+Default.Size = UDim2.new(1, -14, 1, 0)
+Default.Font = Enum.Font.SourceSans
+Default.Text = '<br/><font size="24">Welcome to Lunox!</font><br/><font color="#999999">This project is still under development. You can find all available tools at <font color="#42a5f5">Tools</font>.</font>'
+Default.TextColor3 = Color3.fromRGB(181, 181, 181)
+Default.TextSize = 16.000
+Default.TextWrapped = true
+Default.RichText = true
+Default.TextXAlignment = Enum.TextXAlignment.Left
+Default.TextYAlignment = Enum.TextYAlignment.Top
 
 --// Services
 local RS = game:GetService("RunService")
@@ -66,10 +82,14 @@ local HTTPS = game:GetService("HttpService")
 
 --// Loader
 local baseUrl = "https://raw.githubusercontent.com/danisty/legostuff/master/Lunox/"
-local modules, modulesInfo = {}, {
-	["Library"] = "[UI] Loading library.",
-	["EnvironmentEditor"] = "[Tools] Loading Environment Editor."
+local main, modulesInfo = LunoxData or {
+	modules={}
+}, {
+	{ Name="Utils", Info="[Internal] Utilities." },
+	{ Name="Library", Info="[UI] Library." },
+	{ Name="EnvironmentBrowser", Info="[Tools] Environment Browser." }
 }
+local tools = {}
 
 local function getSize(t)
 	local c = 0
@@ -81,23 +101,58 @@ end
 
 local function require(module)
 	local success, rawModule = pcall(function()
-		return game:HttpGet(baseUrl .. "/" .. HTTPS:UrlEncode(module))
+		return game:HttpGet(baseUrl .. module)
 	end)
-	return success and loadstring(rawModule)(modules)
+	return success and loadstring(rawModule)(main) or nil
 end
 
-local p, s = 1, getSize(modulesInfo)
-for module, info in pairs(modulesInfo) do
-	CurrentResource.Text = info
-	TS:Create(Bar, TweenInfo.new(.2, Enum.EasingStyle.Linear), {
-		Size=UDim2.new(p/s, 0, 0, 5)
-	}):Play()
+if not LunoxData then
+	local p, s = 1, getSize(modulesInfo)
+	for i, module in pairs(modulesInfo) do
+		CurrentResource.Text = module.Info
+		TS:Create(Bar, TweenInfo.new(.2, Enum.EasingStyle.Linear), {
+			Size=UDim2.new(p/s, 0, 0, 5)
+		}):Play()
 
-	modules[module] = require(module .. ".lua")
-	p = p + 1
+		main.modules[module.Name] = require(module.Name .. ".lua")
+		p = p + 1
+	end
+end
+for _,module in pairs(main.modules) do
+	if module.Tool then
+		table.insert(tools, module.Tool.Name)
+	end
 end
 TempScreen:Destroy()
 
 --// Interface
-local MainWindow = modules.Library:Window("LUNOX", 6865413952, nil, Lunox)
-local TabControl = module.Library:TabControl(MainWindow.__Instance.Main.Body)
+local menuBarCallbacks = {
+	File={},
+	Tools=setmetatable({}, {
+		__index=function(self, key)
+			return function(window)
+				local tool = main.modules[table.concat(key:split(" "), "")]:Initialize(window)
+				table.insert(window.LoadedTools, tool)
+				window.TabControl:AddTab(tool.Name, tool.Content, function()
+					tool:Terminate()
+				end)
+			end
+		end
+	})
+}
+
+local function CreateWindow()
+	local Window = main.modules.Library:Window("LUNOX", 6865413952, nil, Lunox)
+	Window.TabControl = main.modules.Library:TabControl(Window.__Instance.Main.Body, Default:Clone())
+	Window.MenuBar = main.modules.Library:MenuBar(Window.__Instance.Main.TitleBar, UDim2.new(0, 80, 0, 0), {
+		{"File", {"New Window"}},
+		{"Tools", tools}
+	}, function(menuOption, contextOption)
+		menuBarCallbacks[menuOption][contextOption](Window)
+	end)
+	Window.__Instance.DisplayOrder = 50
+end
+
+--getgenv().LunoxData = main
+menuBarCallbacks.File["New Window"] = CreateWindow
+CreateWindow()
