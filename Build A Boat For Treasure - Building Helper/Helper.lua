@@ -450,12 +450,26 @@ local function tableCast(table, cast)
 	return ntable
 end
 
+local function getSize(table)
+	local size = 0
+	for i,v in pairs(table) do
+		size += 1
+	end
+	return size
+end
+
 local function module(vector)
 	return math.sqrt(vector.X^2 + vector.Y^2 + vector.Z^2)
 end
 
+local function fixVec3FloatingDifference(vec3)
+	return tostring(vec3):gsub("(%d+)%.%d+(,? ?)", function(g1, g2)
+		return g1 .. g2
+	end)
+end
+
 local function getCornersPositions(part, n)
-	local c,s = part.CFrame, part.Size
+	local c, s = part.CFrame, part.Size
 	local i = c + c.lookVector*(s.Z/2)*n
 
 	local c1 = i + c.rightVector*(s.X/2) + c.upVector*(s.Y/2)
@@ -474,10 +488,6 @@ local function getPartsCFrameAndSize(parts)
 	for i,v in pairs(parts) do
 		local lv11, lv12, lv13, lv14 = getCornersPositions(v, 1)
 		local lv21, lv22, lv23, lv24 = getCornersPositions(v, -1)
-
-		local cminx, cmaxx = minx, maxx
-		local cminy, cmaxy = miny, maxy
-		local cminz, cmaxz = minz, maxz
 
 		minx = math.min(lv11.X, lv12.X, lv13.X, lv14.X, lv21.X, lv22.X, lv23.X, lv24.X, minx)
 		maxx = math.max(lv11.X, lv12.X, lv13.X, lv14.X, lv21.X, lv22.X, lv23.X, lv24.X, maxx)
@@ -502,9 +512,9 @@ end
 --[[Logic]]
 local instructions = {}
 local player = game.Players.LocalPlayer
+local playerData = player.Data
 local isBuilding = false
 
-local blockType = nil
 local usePaintingTool = true
 local useScalingTool = true
 
@@ -880,7 +890,7 @@ local function toggleModelTools(status, customModel, force)
 	if status ~= nil then toolsActive = status end
 	local model = customModel or previewModel
 
-	ToggleTools.Text = toolsActive and "HIDE PREVIEW TOOL" or "SHOW PREVIEW TOOLS"
+	ToggleTools.Text = toolsActive and "HIDE PREVIEW TOOLS" or "SHOW PREVIEW TOOLS"
 	ModelTools.Visible = toolsActive
 
 	if toolsActive then
@@ -924,15 +934,14 @@ Resize.MouseButton1Click:Connect(function()selectTool(tools.Resize)end)
 Rotate.MouseButton1Click:Connect(function()selectTool(tools.Rotate)end)
 
 --> Game data
-if not player.Character then repeat wait() until player.Character end
-local buildingTool = player.Character:FindFirstChild("BuildingTool") or player.Backpack.BuildingTool
-local paintingTool = player.Character:FindFirstChild("PaintingTool") or player.Backpack:FindFirstChild("PaintingTool")
-local scalingTool = player.Character:FindFirstChild("ScalingTool") or player.Backpack:FindFirstChild("ScalingTool")
-local updateBuildGui = getsenv(buildingTool.LocalScript).updateBuildGui
+local buildingTool;
+local paintingTool;
+local scalingTool;
+--local updateBuildGui;
+local func;
+local team;
 
 local whiteZone = workspace.WhiteZone
-local func = getsenv(player.PlayerGui.ShopGui.MainFrame.TabFrame.QuestFrame.Frame.Quests["Quest2"].ImageButton.LocalScript).updateStats
-local team = debug.getupvalue(func, 1)
 previewModel = Instance.new("Model")
 previewModel.Parent = workspace
 
@@ -941,15 +950,19 @@ local viewportModel = Instance.new("Model")
 PreviewViewport.CurrentCamera = viewportCamera
 viewportModel.Parent = PreviewViewport
 
+local blocks = 0
+local speed = 0
+local eta = 0
+
 local function checkGameData()
 	if not player.Character then repeat wait() until player.Character end
 	buildingTool = player.Character:FindFirstChild("BuildingTool") or player.Backpack.BuildingTool
 	paintingTool = player.Character:FindFirstChild("PaintingTool") or player.Backpack:FindFirstChild("PaintingTool")
 	scalingTool = player.Character:FindFirstChild("ScalingTool") or player.Backpack:FindFirstChild("ScalingTool")
-	updateBuildGui = getsenv(buildingTool.LocalScript).updateBuildGui
 
-	func = getsenv(player.PlayerGui.ShopGui.MainFrame.TabFrame.QuestFrame.Frame.Quests["Quest2"].ImageButton.LocalScript).updateStats
-	team = debug.getupvalue(func, 1)
+	--updateBuildGui = getsenv(buildingTool.LocalScript).updateBuildGui
+	func = getsenv(player.PlayerGui.ShopGui.MainFrame.TabFrame.QuestFrame.ScrollingFrame.QuestsLS).updateStats
+	team = debug.getupvalue(func, 2)
 end
 
 local function gridify(parts, customGridSize, ignore)
@@ -1032,12 +1045,14 @@ local function previewBuildingInViewport(previewParts)
 
 	for i,v in pairs(previewParts) do
 		local part = Instance.new("Part")
+
 		part.Parent = viewportModel
 		part.Anchored = true
 		part.CFrame = v.CFrame
 		part.Size = v.Size
 		part.Color = v.Color
 		part.Material = Enum.Material.Plastic
+
 		if i%20 == 0 then wait() end
 	end
 end
@@ -1058,20 +1073,68 @@ local function abortBuilding()
 	toggleBuildPreview(false)
 end
 
-local connection, part;
+local function updateVisualInfo()
+	Blocks.Text = ("Blocks: %d"):format(blocks)
+	Speed.Text = ("Building Speed: %db/s"):format(speed)
+	ETA.Text = ("ETA: %ds"):format(eta)
+end
+
+local partsCallbacks = {}
+local connection;
 connection = workspace.ChildAdded:Connect(function(child)
-	if child.Name == blockType and child:WaitForChild("Tag").Value == player.Name then
-		RS.RenderStepped:Wait()
-		if child.PPart.Size == Vector3.new(2, 2, 2) then
-			part = child.PPart
+	if child.Name:find("Block") and child:WaitForChild("PPart").Size == Vector3.new(2, 2, 2) then
+		local vec = fixVec3FloatingDifference(child.PPart.Position)
+		local callback = partsCallbacks[vec]
+		if callback then
+			callback(child.PPart)
+			partsCallbacks[vec] = nil
+			updateVisualInfo()
 		end
 	end
 end)
 
-local blocksFrame = player.PlayerGui.BuildGui.InventoryFrame.ScrollingFrame.BlocksFrame
+local tasks = {}
+local tasksIds = {}
+local function addPartTask(taskName, callback)
+	if partsCallbacks[taskName] == nil then
+		task.spawn(callback)
+	else
+		local partTasks = tasks[taskName]
+		if partTasks == nil then
+			partTasks = {}
+			tasks[taskName] = partTasks
+		end
+
+		local taskId = (tasksIds[taskName] or 0) + 1
+		tasksIds[taskName] = taskId
+		partTasks[taskId] = callback
+	end
+end
+
+--// Manage tasks
+local checkingTasks = {}
+task.spawn(function()
+	while connection.Connected do
+		for taskName,partTasks in pairs(tasks) do
+			if partsCallbacks[taskName] == nil and not checkingTasks[taskName] then
+				checkingTasks[taskName] = true
+				task.spawn(function()
+					local taskId, callback = next(partTasks)
+					if callback ~= nil then
+						callback()
+						partTasks[taskId] = nil
+					end
+					checkingTasks[taskName] = false
+				end)
+			end
+		end
+		RS.RenderStepped:Wait()
+	end
+end)
+
 local function getActualBlocksAmount(blockType)
-	if not blocksFrame:FindFirstChild(blockType) or not blocksFrame[blockType]:FindFirstChild("AmountText") then return 0 end
-	return tonumber(blocksFrame[blockType].AmountText.Text)
+	local block = playerData:FindFirstChild(blockType)
+	return block and block.Value - block.Used.Value or 0
 end
 
 local function canSelect(block)
@@ -1086,9 +1149,11 @@ local function getNeededBlocks(size)
 end
 
 local availableBlocks = {}
+local buildingParts = game.ReplicatedStorage.BuildingParts
+local blocksFrame = player.PlayerGui.BuildGui.InventoryFrame.ScrollingFrame.BlocksFrame
+
 local function saveBlocks()
 	checkGameData()
-	updateBuildGui()
 	availableBlocks = {}
 	for i,v in pairs(blocksFrame:GetChildren()) do
 		local actualAmount = getActualBlocksAmount(v.Name)
@@ -1101,23 +1166,23 @@ local function saveBlocks()
 			}
 		end
 	end
+	print(ET(availableBlocks))
 end
 
 local function checkBlocks(size)
 	checkGameData()
-	local blockData = availableBlocks[blockType]
-	local hasEnoughBlocks = blockType and (getNeededBlocks(size) <= math.floor(blockData.Amount)) or false
-	if not hasEnoughBlocks then
-		blockType = nil
-		local maxAmount, maxHealth = 0, 0
-		for i,blockData in pairs(availableBlocks) do
-			if blockData.Amount > maxAmount and blockData.Health > maxHealth and getNeededBlocks(size) <= math.floor(blockData.Amount) then
-				blockType = blockData.Type
-				maxAmount = blockData.Amount
-				maxHealth = blockData.Health
-			end
+	local maxAmount, maxHealth = 0, 0
+	local blockType = nil
+
+	for i,blockData in pairs(availableBlocks) do
+		if blockData.Health > maxHealth and getNeededBlocks(size) <= math.floor(blockData.Amount) then
+			blockType = blockData.Type
+			maxAmount = blockData.Amount
+			maxHealth = blockData.Health
 		end
 	end
+
+	return blockType
 end
 
 local function splitPart(part, customUsedBlocks)
@@ -1134,7 +1199,7 @@ local function splitPart(part, customUsedBlocks)
 			end
 		end
 
-		--> There's no way you can get here if the needed amount is 1, unless you don't have more blocks.
+		--> If the needed amount of blocks is 1, you don't have more blocks.
 		if neededBlocks == 1 then
 			return false
 		end
@@ -1144,19 +1209,11 @@ local function splitPart(part, customUsedBlocks)
 			local success = split(v, size+1)
 			if not success then return false end
 		end
+
 		return true
 	end
 	local success = split(part, 2)
 	return success and parts or false
-end
-
-local blocks = 0
-local speed = 0
-local eta = 0
-local function updateVisualInfo()
-	Blocks.Text = ("Blocks: %d"):format(blocks)
-	Speed.Text = ("Building Speed: %db/s"):format(speed)
-	ETA.Text = ("ETA: %ds"):format(eta)
 end
 
 local function timer()
@@ -1165,6 +1222,7 @@ local function timer()
 		speed = oldBlocksCount - blocks
 		eta = math.floor(blocks/math.max(speed, 1))
 		oldBlocksCount = blocks
+		updateVisualInfo()
 	end
 
 	blocks = 0
@@ -1178,6 +1236,7 @@ local function hasEnoughBlocks(previewParts)
 	local usedBlocks = {}
 	for i,v in pairs(previewParts) do
 		if v ~= selectionPart and not splitPart(v, usedBlocks) then
+			print(ET(usedBlocks))
 			return false
 		end
 	end
@@ -1188,41 +1247,58 @@ local lastUsed = 0
 local function buildPreview(previewParts)
 	saveBlocks()
 	if not hasEnoughBlocks(previewParts) then
+		print("Not enough blocks")
 		return
 	end
 
 	local colors = {}
 	blocks = #previewParts
-	spawn(timer)
+	coroutine.wrap(timer)()
+	table.sort(previewParts, function(p1, p2)
+		return p1.Position.Y < p2.Position.Y
+	end)
+
 	for i,v in pairs(previewParts) do
-		if v == selectionPart then continue end
-		for i,v in pairs(splitPart(v) or {}) do
-			checkBlocks(v.Size)
-			if not isBuilding then break end
-			if not blockType then abortBuilding() break end
-			local relativePosition = v.CFrame - team.Position
-			relativePosition = team.CFrame:ToObjectSpace(v.CFrame)
-
-			--warn(("%s Amount: %d -> %d"):format(blockType, availableBlocks[blockType].Amount, availableBlocks[blockType].Amount - getNeededBlocks(v.Size)))
-
-			local amount = player.Data[blockType].Value
-			buildingTool.RF:InvokeServer(blockType, amount, team, relativePosition, true, 1, v.CFrame)
-			availableBlocks[blockType].Amount = availableBlocks[blockType].Amount - getNeededBlocks(v.Size)
-
-			while not part do wait() end
-			table.insert(colors, {part.Parent, v.Color})
-			local partReference = part
-			spawn(function() --> Faster building
-				if scalingTool and useScalingTool and useSTCB.Checked and v.Size ~= Vector3.new(2, 2, 2) then
-					scalingTool.RF:InvokeServer(partReference.Parent, v.Size, v.CFrame)
-				end
-			end)
-			part = nil
+		if v == selectionPart then
+			previewParts[i] = nil
+			continue
 		end
-		previewParts[i]:Destroy()
-		blocks = blocks - 1
-		updateVisualInfo()
+		for _,v in pairs(splitPart(v) or {}) do
+			local partBlockType = checkBlocks(v.Size)
+			if not isBuilding then break end
+			if not partBlockType then abortBuilding() break end
+			local relativePosition = team.CFrame:ToObjectSpace(v.CFrame)
+
+			local amount = player.Data[partBlockType].Value
+			local vec = fixVec3FloatingDifference(v.CFrame.p)
+
+			addPartTask(vec, function()
+				partsCallbacks[vec] = function(part)
+					table.insert(colors, {part.Parent, v.Color})
+					if scalingTool and useScalingTool and useSTCB.Checked and v.Size ~= Vector3.new(2, 2, 2) then
+						scalingTool.RF:InvokeServer(part.Parent, v.Size, v.CFrame)
+					end
+					if previewParts[i] then
+						previewParts[i]:Destroy()
+						previewParts[i] = nil
+					end
+					blocks = blocks - 1
+				end
+				buildingTool.RF:InvokeServer(partBlockType, amount, team, relativePosition, true, 1, v.CFrame)
+			end)
+
+			availableBlocks[partBlockType].Amount = availableBlocks[partBlockType].Amount - getNeededBlocks(v.Size)
+			RS.RenderStepped:Wait()
+		end
 	end
+
+	while blocks > 0 do
+		RS.RenderStepped:Wait()
+	end
+
+	partTasks = {}
+	partsCallbacks = {}
+
 	if paintingTool and usePaintingTool and usePTCB.Checked then
 		paintingTool.RF:InvokeServer(colors)
 	end
@@ -1242,6 +1318,7 @@ local function previewBuilding(force, keepSizeAndPosition)
 		local previewMCF, previewMS = getPartsCFrameAndSize(previewModel:GetChildren())
 		local scale = previewMS.X / size.X
 		origin = previewMCF - Vector3.new(0, previewMS.Y/2, 0)
+
 		for i,v in pairs(modelParts) do
 			local rotation = v.CFrame - v.Position
 			local distance = v.Position - cframe.p
@@ -1258,6 +1335,7 @@ local function previewBuilding(force, keepSizeAndPosition)
 	previewModel:ClearAllChildren()
 	for i,v in pairs(gridify(modelParts)) do
 		local part = Instance.new("Part")
+
 		part.Parent = previewModel
 		part.Anchored = true
 		part.Size = v.Size
@@ -1266,9 +1344,10 @@ local function previewBuilding(force, keepSizeAndPosition)
 		part.Transparency = 0.7
 		part.Material = Enum.Material.Plastic
 		part.CanCollide = false
+
 		if i%20 == 0 then wait() end
 	end
-	print(#previewModel:GetChildren(), previewPartsCount)
+
 	toggleModelTools(toolsActived)
 end
 
@@ -1397,13 +1476,13 @@ BuildPreview.MouseButton1Click:Connect(function()
 	BuildPreview.Text = "ABORT BUILDING"
 	previewPartsCount = 0
 
-	spawn(function()
+	task.spawn(function()
 		while isBuilding do
 			colorTween = TS:Create(BuildPreview, TweenInfo.new(0.4), {BackgroundColor3=Color3.fromRGB(255, 35, 38)})
-			colorTween:Play();colorTween.Completed:Wait();wait(.1)
+			colorTween:Play(); colorTween.Completed:Wait(); wait(.1)
 			if not isBuilding then break end
 			colorTween = TS:Create(BuildPreview, TweenInfo.new(0.4), {BackgroundColor3=Color3.fromRGB(255, 10, 14)})
-			colorTween:Play();colorTween.Completed:Wait();wait(.1)
+			colorTween:Play(); colorTween.Completed:Wait(); wait(.1)
 		end
 	end)
 
@@ -1440,11 +1519,13 @@ end)
 
 Close.MouseButton1Click:Connect(function()
 	abortBuilding()
+	connection:Disconnect()
 	viewportModel:Destroy()
 	BABFTBuildingHelper:Destroy()
 	selectionPart:Destroy()
 	previewModel:Destroy()
 end)
 
+checkGameData()
 makeDraggable(Main, Head)
 main()
