@@ -1166,7 +1166,6 @@ local function saveBlocks()
 			}
 		end
 	end
-	print(ET(availableBlocks))
 end
 
 local function checkBlocks(size)
@@ -1236,7 +1235,6 @@ local function hasEnoughBlocks(previewParts)
 	local usedBlocks = {}
 	for i,v in pairs(previewParts) do
 		if v ~= selectionPart and not splitPart(v, usedBlocks) then
-			print(ET(usedBlocks))
 			return false
 		end
 	end
